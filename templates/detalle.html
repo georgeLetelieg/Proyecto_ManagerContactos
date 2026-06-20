@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center mb-4">
+    <div class="col-md-8">
+        
+        <a href="/contactos/" class="btn btn-outline-secondary mb-3">&larr; Volver a la lista</a>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0">Ficha del Contacto</h4>
+            </div>
+            <div class="card-body">
+                <h2 class="card-title text-primary">{{ contacto.nombre_completo }}</h2>
+                <hr>
+                
+                <div class="row">
+                    <div class="col-sm-6">
+                        <h5 class="text-muted">Datos de Contacto</h5>
+                        <p><strong>Teléfono:</strong> {{ contacto.telefono }}</p>
+                        <p><strong>Correo:</strong> 
+                            {% if contacto.correo %}
+                                <a href="mailto:{{ contacto.correo }}">{{ contacto.correo }}</a>
+                            {% else %}
+                                <span class="text-muted fst-italic">No registrado</span>
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <div class="col-sm-6">
+                        <h5 class="text-muted">Contexto</h5>
+                        <p><strong>Categoría:</strong> <span class="badge bg-secondary">{{ categoria.nombre }}</span></p>
+                        <p><strong>Grupo:</strong> {{ grupo.nombre }}</p>
+                        {% if grupo.descripcion %}
+                            <p class="small text-muted border-start ps-2">"{{ grupo.descripcion }}"</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div>
+            <div class="card-footer text-end bg-light">
+                <a href="#" class="btn btn-warning">Editar Datos</a>
+                <a href="#" class="btn btn-danger">Eliminar Registro</a>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
