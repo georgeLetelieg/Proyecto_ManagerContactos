@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, url_for
 
 app = Flask(__name__)
 
@@ -61,7 +61,8 @@ def lista_contactos():
             "correo": c['correo'],
             "grupo": nombre_grupo
         }
-    contactos_vista.append(contacto_completo)
+        contactos_vista.append(contacto_completo)
+
     return render_template('lista.html', lista_contactos=contactos_vista)
 
 
@@ -88,6 +89,40 @@ def detalle_contacto(id):
         grupo=grupo_encontrado, 
         categoria=categoria_encontrada
         )
+
+# get y post
+@app.route('/contactos/nuevo/', methods=['GET', 'POST'])
+def crear_contacto():
+    if request.method == 'POST':
+        # 1. Capturamos los datos enviados por el usuario en el formulario
+        nombre = request.form.get('nombre')
+        telefono = request.form.get('telefono')
+        correo = request.form.get('correo')
+        grupo_id = int(request.form.get('grupo'))
+
+        # 2. Validación planificada: Teléfono de exactamente 9 dígitos
+        if len(telefono) != 9 or not telefono.isdigit():
+            return "Error: El teléfono debe tener exactamente 9 números.", 400
+
+        # 3. Calculamos un nuevo ID simulado
+        nuevo_id = len(contactos) + 1
+
+        # 4. Armamos el nuevo registro y lo guardamos en nuestra lista
+        nuevo_contacto = {
+            "id_contacto": nuevo_id,
+            "nombre_completo": nombre,
+            "telefono": telefono,
+            "correo": correo,
+            "fk_grupo": grupo_id
+        }
+        contactos.append(nuevo_contacto)
+
+        # 5. Redireccionamos a la tabla para ver el nuevo contacto agregado
+        return redirect(url_for('lista_contactos'))
+
+    # Si el método es GET (el usuario solo entró a la página), le mostramos el formulario
+    # Le pasamos la lista de grupos para armar el menú desplegable (select)
+    return render_template('form_crear.html', grupos=grupos)
 
 # Hacer que corra el servidor
 

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">Añadir Nuevo Contacto</h4>
+            </div>
+            <div class="card-body">
+                
+                <form action="/contactos/nuevo/" method="POST">
+                    
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre Completo *</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" maxlength="100" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="telefono" class="form-label">Teléfono *</label>
+                        <input type="text" class="form-control" id="telefono" name="telefono" placeholder="Ej: 912345678" minlength="9" maxlength="9" required>
+                        <div class="form-text">Debe contener exactamente 9 números.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="correo" class="form-label">Correo Electrónico (Opcional)</label>
+                        <input type="email" class="form-control" id="correo" name="correo" placeholder="ejemplo@correo.com">
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="grupo" class="form-label">Grupo / Contexto *</label>
+                        <select class="form-select" id="grupo" name="grupo" required>
+                            <option value="" disabled selected>Selecciona un grupo...</option>
+                            {% for g in grupos %}
+                                <option value="{{ g.id_grupo }}">{{ g.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">Guardar Contacto</button>
+                        <a href="/contactos/" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
