@@ -47,23 +47,39 @@ def inicio():
 
 @app.route('/contactos/')
 def lista_contactos():
-    contactos_vista = []
-    for c in contactos:
-        # Buscamos el nombre del grupo correspondiente
-        grupo_encontrado = next((g for g in grupos if g['id_grupo'] == c['fk_grupo']), None)
-        nombre_grupo = grupo_encontrado['nombre'] if grupo_encontrado else "Desconocido"
-        
-        # Armamos el contacto con el nombre del grupo ya incluido
-        contacto_completo = {
-            "id": c['id_contacto'],
-            "nombre": c['nombre_completo'],
-            "telefono": c['telefono'],
-            "correo": c['correo'],
-            "grupo": nombre_grupo
-        }
-        contactos_vista.append(contacto_completo)
+    # 1. Capturamos el filtro de la URL (ej: /contactos/?categoria=1)
+    categoria_filtro = request.args.get('categoria')
 
-    return render_template('lista.html', lista_contactos=contactos_vista)
+    # 2. Decidimos qué grupos mostrar
+    grupos_a_mostrar = grupos
+    if categoria_filtro:
+        # Filtramos solo los grupos que pertenecen a la categoría seleccionada
+        grupos_a_mostrar = [g for g in grupos if str(g['fk_categoria']) == categoria_filtro]
+
+    # 3. Armamos una estructura agrupada: [ {grupo, nombre_categoria, contactos_del_grupo: []} ]
+    vista_agrupada = []
+    
+    for g in grupos_a_mostrar:
+        # Buscar el nombre de la categoría de este grupo
+        cat = next((c for c in categorias if c['id_categoria'] == g['fk_categoria']), None)
+        nombre_cat = cat['nombre'] if cat else "Sin Categoría"
+
+        # Buscar todos los contactos que pertenecen SOLAMENTE a este grupo
+        contactos_del_grupo = [c for c in contactos if c['fk_grupo'] == g['id_grupo']]
+
+        # Guardamos el "paquete" completo
+        vista_agrupada.append({
+            "id_grupo": g['id_grupo'],
+            "nombre_grupo": g['nombre'],
+            "nombre_categoria": nombre_cat,
+            "contactos": contactos_del_grupo
+        })
+
+    # Enviamos los datos, la lista de categorías (para el select) y cuál está seleccionada
+    return render_template('lista.html', 
+                           vista_agrupada=vista_agrupada, 
+                           categorias=categorias,
+                           categoria_seleccionada=categoria_filtro)
 
 
 @app.route('/contactos/<int:id>/')

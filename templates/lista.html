@@ -1,48 +1,93 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row mb-3">
-    <div class="col">
-        <h2>Mi Agenda de Contactos</h2>
+<div class="row mb-4 align-items-center">
+    <div class="col-md-4">
+        <h2>Mi Agenda</h2>
     </div>
-    <div class="col text-end">
-        <a href="/contactos/nuevo/" class="btn btn-success">Añadir Nuevo Contacto</a> </div>
+    
+    <div class="col-md-5">
+        <form action="/contactos/" method="GET" class="d-flex">
+            <select name="categoria" class="form-select me-2">
+                <option value="">Todas las Categorías</option>
+                {% for c in categorias %}
+                    <option value="{{ c.id_categoria }}" {% if categoria_seleccionada == c.id_categoria|string %}selected{% endif %}>
+                        {{ c.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-secondary">Filtrar</button>
+        </form>
+    </div>
+
+    <div class="col-md-3 text-end">
+        <a href="/contactos/nuevo/" class="btn btn-success">Añadir Contacto</a>
+    </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body">
-        <table class="table table-hover align-middle">
-            <thead class="table-dark">
-                <tr>
-                    <th>Nombre Completo</th>
-                    <th>Teléfono</th>
-                    <th>Correo</th>
-                    <th>Grupo</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for contacto in lista_contactos %}
-                <tr>
-                    <td><strong>{{ contacto.nombre }}</strong></td>
-                    <td>{{ contacto.telefono }}</td>
-                    <td>
-                        {% if contacto.correo %}
-                            <a href="mailto:{{ contacto.correo }}">{{ contacto.correo }}</a>
-                        {% else %}
-                            <span class="text-muted">Sin correo</span>
-                        {% endif %}
-                    </td>
-                    <td><span class="badge bg-secondary">{{ contacto.grupo }}</span></td>
-                    <td>
-                        <a href="/contactos/{{ contacto.id }}/" class="btn btn-info btn-sm text-white">Ver</a>
-                        <a href="/contactos/{{ contacto.id }}/editar/" class="btn btn-warning btn-sm">Editar</a>
-                        <a href="/contactos/{{ contacto.id }}/eliminar/" class="btn btn-danger btn-sm">Eliminar</a>
-                    </td>
-                </tr>
-                {% endfor %}
-                </tbody>
-        </table>
+<div class="accordion shadow-sm" id="acordeonGrupos">
+    
+    {% for grupo in vista_agrupada %}
+    <div class="accordion-item">
+        
+        <h2 class="accordion-header" id="heading-{{ grupo.id_grupo }}">
+            <button class="accordion-button collapsed bg-light text-dark fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ grupo.id_grupo }}">
+                <span class="badge bg-primary me-2">{{ grupo.nombre_categoria }}</span> 
+                Grupo: {{ grupo.nombre_grupo }} 
+                <span class="badge bg-secondary ms-2">{{ grupo.contactos|length }} Contacto(s)</span>
+            </button>
+        </h2>
+        
+        <div id="collapse-{{ grupo.id_grupo }}" class="accordion-collapse collapse" data-bs-parent="#acordeonGrupos">
+            <div class="accordion-body p-0">
+                
+                {% if grupo.contactos %}
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Nombre Completo</th>
+                            <th>Teléfono</th>
+                            <th>Correo</th>
+                            <th class="text-end pe-3">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contacto in grupo.contactos %}
+                        <tr>
+                            <td class="ps-3"><strong>{{ contacto.nombre_completo }}</strong></td>
+                            <td>{{ contacto.telefono }}</td>
+                            <td>
+                                {% if contacto.correo %}
+                                    <a href="mailto:{{ contacto.correo }}">{{ contacto.correo }}</a>
+                                {% else %}
+                                    <span class="text-muted small">Sin correo</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-3">
+                                <a href="/contactos/{{ contacto.id_contacto }}/" class="btn btn-info btn-sm text-white">Ver</a>
+                                <a href="/contactos/{{ contacto.id_contacto }}/editar/" class="btn btn-warning btn-sm">Editar</a>
+                                <a href="/contactos/{{ contacto.id_contacto }}/eliminar/" class="btn btn-danger btn-sm">Eliminar</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    No hay contactos registrados en este grupo todavía.
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
     </div>
+    {% endfor %}
+
+    {% if not vista_agrupada %}
+    <div class="alert alert-warning text-center mt-3">
+        No se encontraron grupos para esta categoría.
+    </div>
+    {% endif %}
+
 </div>
 {% endblock %}
