@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">Editar Contacto</h4>
+            </div>
+            <div class="card-body">
+                
+                <form action="/contactos/{{ contacto.id_contacto }}/editar/" method="POST">
+                    
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre Completo *</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" value="{{ contacto.nombre_completo }}" maxlength="100" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="telefono" class="form-label">Teléfono *</label>
+                        <input type="text" class="form-control" id="telefono" name="telefono" value="{{ contacto.telefono }}" minlength="9" maxlength="9" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="correo" class="form-label">Correo Electrónico (Opcional)</label>
+                        <input type="email" class="form-control" id="correo" name="correo" value="{{ contacto.correo }}">
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="grupo" class="form-label">Grupo / Contexto *</label>
+                        <select class="form-select" id="grupo" name="grupo" required>
+                            {% for g in grupos %}
+                                <option value="{{ g.id_grupo }}" {% if g.id_grupo == contacto.fk_grupo %}selected{% endif %}>
+                                    {{ g.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                        <a href="/contactos/" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

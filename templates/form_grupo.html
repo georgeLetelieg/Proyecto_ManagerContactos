@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Crear Nuevo Grupo (Ej: Familia Materna)</h4>
+            </div>
+            <div class="card-body">
+                <form action="/grupos/nuevo/" method="POST">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre del Grupo *</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción (Opcional)</label>
+                        <input type="text" class="form-control" id="descripcion" name="descripcion">
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="categoria" class="form-label">Pertenece a la Categoría *</label>
+                        <select class="form-select" id="categoria" name="categoria" required>
+                            <option value="" disabled selected>Selecciona una categoría mayor...</option>
+                            {% for c in categorias %}
+                                <option value="{{ c.id_categoria }}">{{ c.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-info text-white">Guardar Grupo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

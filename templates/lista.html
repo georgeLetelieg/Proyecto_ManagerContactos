@@ -36,8 +36,8 @@
                     <td><span class="badge bg-secondary">{{ contacto.grupo }}</span></td>
                     <td>
                         <a href="/contactos/{{ contacto.id }}/" class="btn btn-info btn-sm text-white">Ver</a>
-                        <a href="#" class="btn btn-warning btn-sm">Editar</a>
-                        <a href="#" class="btn btn-danger btn-sm">Eliminar</a>
+                        <a href="/contactos/{{ contacto.id }}/editar/" class="btn btn-warning btn-sm">Editar</a>
+                        <a href="/contactos/{{ contacto.id }}/eliminar/" class="btn btn-danger btn-sm">Eliminar</a>
                     </td>
                 </tr>
                 {% endfor %}

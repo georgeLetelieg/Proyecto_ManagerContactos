@@ -124,6 +124,101 @@ def crear_contacto():
     # Le pasamos la lista de grupos para armar el menú desplegable (select)
     return render_template('form_crear.html', grupos=grupos)
 
+
+#Edicion contactos
+@app.route('/contactos/<int:id>/editar/', methods=['GET', 'POST'])
+def editar_contacto(id):
+    # 1. Buscamos el contacto que queremos editar
+    contacto_encontrado = next((c for c in contactos if c['id_contacto'] == id), None)
+    
+    if not contacto_encontrado:
+        return "Contacto no encontrado", 404
+
+    if request.method == 'POST':
+        # 2. Si el usuario envió el formulario, capturamos los nuevos datos
+        nuevo_nombre = request.form.get('nombre')
+        nuevo_telefono = request.form.get('telefono')
+        nuevo_correo = request.form.get('correo')
+        nuevo_grupo = int(request.form.get('grupo'))
+
+        # Validación del teléfono
+        if len(nuevo_telefono) != 9 or not nuevo_telefono.isdigit():
+            return "Error: El teléfono debe tener exactamente 9 números.", 400
+
+        # 3. Actualizamos los datos en nuestro diccionario en memoria
+        contacto_encontrado['nombre_completo'] = nuevo_nombre
+        contacto_encontrado['telefono'] = nuevo_telefono
+        contacto_encontrado['correo'] = nuevo_correo
+        contacto_encontrado['fk_grupo'] = nuevo_grupo
+
+        # 4. Redireccionamos de vuelta a la lista
+        return redirect(url_for('lista_contactos'))
+
+    # Si es GET, mostramos el formulario con los datos actuales
+    return render_template('form_editar.html', contacto=contacto_encontrado, grupos=grupos)
+
+
+# Eliminira
+@app.route('/contactos/<int:id>/eliminar/', methods=['GET', 'POST'])
+def eliminar_contacto(id):
+    # 1. Buscamos el contacto que se desea borrar
+    contacto_encontrado = next((c for c in contactos if c['id_contacto'] == id), None)
+    
+    if not contacto_encontrado:
+        return "Contacto no encontrado", 404
+
+    if request.method == 'POST':
+        # 2. Si el usuario confirma en el formulario (POST), lo eliminamos de la lista
+        contactos.remove(contacto_encontrado)
+        # 3. Redireccionamos de vuelta a la lista general
+        return redirect(url_for('lista_contactos'))
+
+    # Si es GET, mostramos la página de confirmación con los datos del contacto
+    return render_template('confirmar_eliminar.html', contacto=contacto_encontrado)
+
+
+# ==========================================
+# RUTAS PARA CATEGORÍAS Y GRUPOS
+# ==========================================
+
+@app.route('/categorias/nuevo/', methods=['GET', 'POST'])
+def crear_categoria():
+    if request.method == 'POST':
+        nombre_cat = request.form.get('nombre')
+        nuevo_id = len(categorias) + 1
+        
+        nueva_categoria = {
+            "id_categoria": nuevo_id,
+            "nombre": nombre_cat
+        }
+        categorias.append(nueva_categoria)
+        # Te redirige a crear un grupo para que uses tu nueva categoría de inmediato
+        return redirect(url_for('crear_grupo'))
+        
+    return render_template('form_categoria.html')
+
+
+@app.route('/grupos/nuevo/', methods=['GET', 'POST'])
+def crear_grupo():
+    if request.method == 'POST':
+        nombre_grupo = request.form.get('nombre')
+        descripcion = request.form.get('descripcion')
+        fk_categoria = int(request.form.get('categoria'))
+        
+        nuevo_id = len(grupos) + 1
+        
+        nuevo_grupo = {
+            "id_grupo": nuevo_id,
+            "nombre": nombre_grupo,
+            "descripcion": descripcion,
+            "fk_categoria": fk_categoria
+        }
+        grupos.append(nuevo_grupo)
+        return redirect(url_for('crear_contacto'))
+        
+    # Le pasamos las categorías para que el usuario elija a cuál pertenece el nuevo grupo
+    return render_template('form_grupo.html', categorias=categorias)
+
 # Hacer que corra el servidor
 
 if __name__ == '__main__':
