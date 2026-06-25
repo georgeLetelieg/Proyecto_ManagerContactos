@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 
 app = Flask(__name__)
 
@@ -13,26 +13,33 @@ categorias = [
 
 # Grupos
 grupos = [
-    {"id_grupo": 1, "nombre": "Familia Materna", "descripcion": "Tíos y primos", "fk_categoria": 1},
-    {"id_grupo": 2, "nombre": "Compañeros de Tesis", "descripcion": "Proyecto integrador", "fk_categoria": 2},
-    {"id_grupo": 3, "nombre": "Mecánicos", "descripcion": "Mantención del auto", "fk_categoria": 3}
+    {"id_grupo": 1, "nombre": "Familia Materna", "descripcion": "Tios y primos", "fk_categoria": 1},
+    {"id_grupo": 2, "nombre": "Compas de Tesis", "descripcion": "Proyecto integrador", "fk_categoria": 2},
+    {"id_grupo": 3, "nombre": "Mecanicos", "descripcion": "Mantencion del auto", "fk_categoria": 3}
 ]
 
 # Contactos
 contactos = [
     {
         "id_contacto": 1, 
-        "nombre_completo": "Ana López", 
+        "nombre_completo": "Ana Lopez", 
         "telefono": "912345678", 
-        "correo": "ana@ejemplo.com", 
+        "correo": "ana@casa.com", 
         "fk_grupo": 1
     },
     {
         "id_contacto": 2, 
-        "nombre_completo": "Carlos Martínez", 
+        "nombre_completo": "Carlos Martinez", 
         "telefono": "987654321", 
         "correo": "",
         "fk_grupo": 2
+    },
+    {
+        "id_contacto": 3, 
+        "nombre_completo": "Daniel Fernandez", 
+        "telefono": "934249391", 
+        "correo": "daniel@casa.cl",
+        "fk_grupo": 3
     }
 ]
 
@@ -234,6 +241,16 @@ def crear_grupo():
         
     # Le pasamos las categorías para que el usuario elija a cuál pertenece el nuevo grupo
     return render_template('form_grupo.html', categorias=categorias)
+
+
+# rutas api
+@app.route('/api/contactos', methods=['GET'])
+def api_contactos():
+    return jsonify(contactos)
+
+@app.route('/api/grupos', methods=['GET'])
+def api_grupos():
+    return jsonify(grupos)
 
 # Hacer que corra el servidor
 
