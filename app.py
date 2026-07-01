@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flasgger import Swagger
 
 app = Flask(__name__)
+swagger = Swagger(app)
 
 # DATOS
 
@@ -246,6 +248,36 @@ def crear_grupo():
 # rutas api
 @app.route('/api/contactos', methods=['GET'])
 def api_contactos():
+    """
+    Obtener la lista completa de contactos
+    Este endpoint devuelve todos los contactos registrados actualmente en el sistema.
+    ---
+    tags:
+      - Contactos API
+    responses:
+      200:
+        description: Una lista de objetos de contacto
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id_contacto:
+                type: integer
+                example: 1
+              nombre_completo:
+                type: string
+                example: "Ana López"
+              telefono:
+                type: string
+                example: "912345678"
+              correo:
+                type: string
+                example: "ana@ejemplo.com"
+              fk_grupo:
+                type: integer
+                example: 1
+    """
     return jsonify(contactos)
 
 @app.route('/api/grupos', methods=['GET'])

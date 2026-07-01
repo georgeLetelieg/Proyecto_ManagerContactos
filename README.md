@@ -35,6 +35,10 @@ Python 3.12, framework Flask.
 
 - python app.py
 
+# Para ejecutar documentacion api con swager api
+
+- http://127.0.0.1:5000/apidocs/
+
 # Estructura del Directorio
 
 Proyecto_Manager_de_Contactos/
