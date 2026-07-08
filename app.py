@@ -1,3 +1,4 @@
+import os
 import pymysql
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session
@@ -10,14 +11,23 @@ swagger = Swagger(app)
 app.secret_key = 'manager_super_secreto_2026'
 
 # ==========================================
-# 1. CONFIGURACIÓN DE BASE DE DATOS (XAMPP)
+# 1. CONFIGURACIÓN DE BASE DE DATOS (MySQL / Railway)
 # ==========================================
 def conectar_db():
+    # Railway inyectará estas variables automáticamente. 
+    # Si no existen (estás en local), usará los valores de XAMPP por defecto.
+    host = os.environ.get('MYSQLHOST', '127.0.0.1')
+    user = os.environ.get('MYSQLUSER', 'root')
+    password = os.environ.get('MYSQLPASSWORD', '')
+    database = os.environ.get('MYSQLDATABASE', 'manager_contactos')
+    port = int(os.environ.get('MYSQLPORT', 3306))
+
     return pymysql.connect(
-        host='127.0.0.1',
-        user='root',
-        password='',
-        database='manager_contactos',
+        host=host,
+        user=user,
+        password=password,
+        database=database,
+        port=port,
         cursorclass=pymysql.cursors.DictCursor
     )
 
@@ -34,11 +44,9 @@ def pagina_no_encontrada(e):
 # 2. SISTEMA DE AUTENTICACIÓN (LOGIN)
 # ==========================================
 
-# Decorador para proteger rutas
 def login_requerido(f):
     @wraps(f)
     def funcion_decorada(*args, **kwargs):
-        # Si no hay un 'usuario' en la sesión actual, bloquea el paso
         if 'usuario' not in session:
             return redirect(url_for('login'))
         return f(*args, **kwargs)
@@ -48,13 +56,24 @@ def login_requerido(f):
 def login():
     error = None
     if request.method == 'POST':
-        usuario = request.form['usuario']
-        password = request.form['password']
+        usuario_form = request.form['usuario']
+        password_form = request.form['password']
         
-        # Validación de credenciales fijas
-        if usuario == 'georgebase' and password == 'skyressventus':
-            session['usuario'] = usuario # Guardamos la sesión
-            return redirect(url_for('inicio')) # Lo dejamos pasar
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        
+        cursor.execute(
+            "SELECT * FROM usuario WHERE username = %s AND password = %s", 
+            (usuario_form, password_form)
+        )
+        usuario_db = cursor.fetchone()
+        
+        cursor.close()
+        conexion.close()
+        
+        if usuario_db:
+            session['usuario'] = usuario_db['username'] 
+            return redirect(url_for('inicio')) 
         else:
             error = "Usuario o contraseña incorrectos."
             
@@ -62,12 +81,11 @@ def login():
 
 @app.route('/logout')
 def logout():
-    # Elimina al usuario de la sesión para cerrar sesión
     session.pop('usuario', None)
     return redirect(url_for('login'))
 
 # ==========================================
-# 3. RUTAS HTML (Protegidas con @login_requerido)
+# 3. RUTAS HTML (Frontend)
 # ==========================================
 
 @app.route('/')
@@ -262,7 +280,7 @@ def crear_grupo():
     return render_template('form_grupo.html', categorias=categorias_db)
 
 # ==========================================
-# 4. RUTAS API (Sin protección para pruebas en Swagger)
+# 4. RUTAS API (Documentadas y en Formato JSON)
 # ==========================================
 
 @app.route('/api/contactos', methods=['GET'])
@@ -327,15 +345,15 @@ def api_crear_contacto():
         schema:
           type: object
           properties:
-            nombre_completo: {type: string, example: "Pedro Pascal"}
-            telefono: {type: string, example: "977665544"}
-            correo: {type: string, example: "pedro@ejemplo.com"}
-            fk_grupo: {type: integer, example: 1}
+            nombre_completo: {type: string}
+            telefono: {type: string}
+            correo: {type: string}
+            fk_grupo: {type: integer}
     responses:
       201:
         description: Contacto creado
       400:
-        description: Error de validación (Bad Request)
+        description: Error de validación
     """
     datos = request.get_json()
     telefono = datos.get('telefono', '').strip()
@@ -425,13 +443,12 @@ def api_eliminar_contacto(id_contacto):
 def api_resumen_estadisticas():
     """
     Obtener estadísticas del sistema (Punto Extra)
-    Devuelve los totales calculados de las entidades principales.
     ---
     tags:
       - Resumen API
     responses:
       200:
-        description: JSON con los totales de contactos, grupos y categorías
+        description: JSON con los totales de entidades
     """
     conexion = conectar_db()
     cursor = conexion.cursor()
