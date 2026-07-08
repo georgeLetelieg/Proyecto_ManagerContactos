@@ -8,7 +8,13 @@
                 <h4 class="mb-0">Añadir Nuevo Contacto</h4>
             </div>
             <div class="card-body">
-                
+                <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger" role="alert">
+                    ⚠️ {{ error }}
+                </div>
+                {% endif %}
+
                 <form action="/contactos/nuevo/" method="POST">
                     
                     <div class="mb-3">

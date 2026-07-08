@@ -1,290 +1,461 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+import pymysql
+from functools import wraps
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session
 from flasgger import Swagger
 
 app = Flask(__name__)
 swagger = Swagger(app)
 
-# DATOS
+# CLAVE SECRETA OBLIGATORIA PARA LAS SESIONES
+app.secret_key = 'manager_super_secreto_2026'
 
-# Categorías
-categorias = [
-    {"id_categoria": 1, "nombre": "Familia"},
-    {"id_categoria": 2, "nombre": "Universidad"},
-    {"id_categoria": 3, "nombre": "Servicios"}
-]
+# ==========================================
+# 1. CONFIGURACIÓN DE BASE DE DATOS (XAMPP)
+# ==========================================
+def conectar_db():
+    return pymysql.connect(
+        host='127.0.0.1',
+        user='root',
+        password='',
+        database='manager_contactos',
+        cursorclass=pymysql.cursors.DictCursor
+    )
 
-# Grupos
-grupos = [
-    {"id_grupo": 1, "nombre": "Familia Materna", "descripcion": "Tios y primos", "fk_categoria": 1},
-    {"id_grupo": 2, "nombre": "Compas de Tesis", "descripcion": "Proyecto integrador", "fk_categoria": 2},
-    {"id_grupo": 3, "nombre": "Mecanicos", "descripcion": "Mantencion del auto", "fk_categoria": 3}
-]
+# ==========================================
+# MANEJO GLOBAL DE ERRORES (404 Not Found)
+# ==========================================
+@app.errorhandler(404)
+def pagina_no_encontrada(e):
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Recurso no encontrado (404)"}), 404
+    return "<h1>Error 404</h1><p>El registro o la página que buscas no existe en el sistema.</p><a href='/'>Volver al inicio</a>", 404
 
-# Contactos
-contactos = [
-    {
-        "id_contacto": 1, 
-        "nombre_completo": "Ana Lopez", 
-        "telefono": "912345678", 
-        "correo": "ana@casa.com", 
-        "fk_grupo": 1
-    },
-    {
-        "id_contacto": 2, 
-        "nombre_completo": "Carlos Martinez", 
-        "telefono": "987654321", 
-        "correo": "",
-        "fk_grupo": 2
-    },
-    {
-        "id_contacto": 3, 
-        "nombre_completo": "Daniel Fernandez", 
-        "telefono": "934249391", 
-        "correo": "daniel@casa.cl",
-        "fk_grupo": 3
-    }
-]
+# ==========================================
+# 2. SISTEMA DE AUTENTICACIÓN (LOGIN)
+# ==========================================
 
-# Rutas
+# Decorador para proteger rutas
+def login_requerido(f):
+    @wraps(f)
+    def funcion_decorada(*args, **kwargs):
+        # Si no hay un 'usuario' en la sesión actual, bloquea el paso
+        if 'usuario' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return funcion_decorada
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        usuario = request.form['usuario']
+        password = request.form['password']
+        
+        # Validación de credenciales fijas
+        if usuario == 'georgebase' and password == 'skyressventus':
+            session['usuario'] = usuario # Guardamos la sesión
+            return redirect(url_for('inicio')) # Lo dejamos pasar
+        else:
+            error = "Usuario o contraseña incorrectos."
+            
+    return render_template('login.html', error=error)
+
+@app.route('/logout')
+def logout():
+    # Elimina al usuario de la sesión para cerrar sesión
+    session.pop('usuario', None)
+    return redirect(url_for('login'))
+
+# ==========================================
+# 3. RUTAS HTML (Protegidas con @login_requerido)
+# ==========================================
 
 @app.route('/')
+@login_requerido
 def inicio():
-    total_contactos = len(contactos)
-    return render_template('inicio.html', total=total_contactos)
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT COUNT(*) AS total FROM contacto")
+    resultado = cursor.fetchone()
+    cursor.close()
+    conexion.close()
+    return render_template('inicio.html', total=resultado['total'])
 
-
-@app.route('/contactos/')
+@app.route('/contactos/', methods=['GET'])
+@login_requerido
 def lista_contactos():
-    # 1. Capturamos el filtro de la URL (ej: /contactos/?categoria=1)
-    categoria_filtro = request.args.get('categoria')
-
-    # 2. Decidimos qué grupos mostrar
-    grupos_a_mostrar = grupos
-    if categoria_filtro:
-        # Filtramos solo los grupos que pertenecen a la categoría seleccionada
-        grupos_a_mostrar = [g for g in grupos if str(g['fk_categoria']) == categoria_filtro]
-
-    # 3. Armamos una estructura agrupada: [ {grupo, nombre_categoria, contactos_del_grupo: []} ]
-    vista_agrupada = []
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    categoria_seleccionada = request.args.get('categoria', '')
     
-    for g in grupos_a_mostrar:
-        # Buscar el nombre de la categoría de este grupo
-        cat = next((c for c in categorias if c['id_categoria'] == g['fk_categoria']), None)
-        nombre_cat = cat['nombre'] if cat else "Sin Categoría"
-
-        # Buscar todos los contactos que pertenecen SOLAMENTE a este grupo
-        contactos_del_grupo = [c for c in contactos if c['fk_grupo'] == g['id_grupo']]
-
-        # Guardamos el "paquete" completo
+    cursor.execute("SELECT * FROM categoria")
+    categorias_db = cursor.fetchall()
+    
+    if categoria_seleccionada:
+        cursor.execute("SELECT * FROM grupo WHERE fk_categoria = %s", (categoria_seleccionada,))
+    else:
+        cursor.execute("SELECT * FROM grupo")
+    grupos_db = cursor.fetchall()
+    
+    vista_agrupada = []
+    for grupo in grupos_db:
+        cat_nombre = next((c['nombre'] for c in categorias_db if c['id_categoria'] == grupo['fk_categoria']), "Sin Categoría")
+        cursor.execute("SELECT * FROM contacto WHERE fk_grupo = %s", (grupo['id_grupo'],))
+        contactos_del_grupo = cursor.fetchall()
         vista_agrupada.append({
-            "id_grupo": g['id_grupo'],
-            "nombre_grupo": g['nombre'],
-            "nombre_categoria": nombre_cat,
+            "id_grupo": grupo['id_grupo'],
+            "nombre_grupo": grupo['nombre'],
+            "nombre_categoria": cat_nombre,
             "contactos": contactos_del_grupo
         })
+        
+    cursor.close()
+    conexion.close()
+    return render_template('lista.html', vista_agrupada=vista_agrupada, categorias=categorias_db, categoria_seleccionada=categoria_seleccionada)
 
-    # Enviamos los datos, la lista de categorías (para el select) y cuál está seleccionada
-    return render_template('lista.html', 
-                           vista_agrupada=vista_agrupada, 
-                           categorias=categorias,
-                           categoria_seleccionada=categoria_filtro)
-
-
-@app.route('/contactos/<int:id>/')
-def detalle_contacto(id):
-    # 1. Buscamos el contacto específico usando su ID
-    contacto_encontrado = next((c for c in contactos if c['id_contacto'] == id), None)
+@app.route('/contactos/<int:id_contacto>/', methods=['GET'])
+@login_requerido
+def detalle_contacto(id_contacto):
+    conexion = conectar_db()
+    cursor = conexion.cursor()
     
-    # Si alguien escribe una ID que no existe en la URL, mostramos un error 404
-    if not contacto_encontrado:
-        return "Contacto no encontrado", 404
-
-    # 2. Buscamos el grupo al que pertenece para tener su nombre y descripción
-    grupo_encontrado = next((g for g in grupos if g['id_grupo'] == contacto_encontrado['fk_grupo']), None)
+    cursor.execute("SELECT * FROM contacto WHERE id_contacto = %s", (id_contacto,))
+    contacto = cursor.fetchone()
     
-    # 3. Buscamos la categoría mayor usando la llave foránea del grupo
-    categoria_encontrada = None
-    if grupo_encontrado:
-        categoria_encontrada = next((cat for cat in categorias if cat['id_categoria'] == grupo_encontrado['fk_categoria']), None)
+    if not contacto:
+        cursor.close()
+        conexion.close()
+        from flask import abort
+        abort(404) 
+        
+    cursor.execute("SELECT * FROM grupo WHERE id_grupo = %s", (contacto['fk_grupo'],))
+    grupo = cursor.fetchone()
+    
+    categoria = None
+    if grupo:
+        cursor.execute("SELECT * FROM categoria WHERE id_categoria = %s", (grupo['fk_categoria'],))
+        categoria = cursor.fetchone()
+        
+    cursor.close()
+    conexion.close()
+    return render_template('detalle.html', contacto=contacto, grupo=grupo, categoria=categoria)
 
-    # Enviamos todos estos datos estructurados a la plantilla
-    return render_template('detalle.html', 
-        contacto=contacto_encontrado, 
-        grupo=grupo_encontrado, 
-        categoria=categoria_encontrada
-        )
-
-# get y post
 @app.route('/contactos/nuevo/', methods=['GET', 'POST'])
+@login_requerido
 def crear_contacto():
-    if request.method == 'POST':
-        # 1. Capturamos los datos enviados por el usuario en el formulario
-        nombre = request.form.get('nombre')
-        telefono = request.form.get('telefono')
-        correo = request.form.get('correo')
-        grupo_id = int(request.form.get('grupo'))
-
-        # 2. Validación planificada: Teléfono de exactamente 9 dígitos
-        if len(telefono) != 9 or not telefono.isdigit():
-            return "Error: El teléfono debe tener exactamente 9 números.", 400
-
-        # 3. Calculamos un nuevo ID simulado
-        nuevo_id = len(contactos) + 1
-
-        # 4. Armamos el nuevo registro y lo guardamos en nuestra lista
-        nuevo_contacto = {
-            "id_contacto": nuevo_id,
-            "nombre_completo": nombre,
-            "telefono": telefono,
-            "correo": correo,
-            "fk_grupo": grupo_id
-        }
-        contactos.append(nuevo_contacto)
-
-        # 5. Redireccionamos a la tabla para ver el nuevo contacto agregado
-        return redirect(url_for('lista_contactos'))
-
-    # Si el método es GET (el usuario solo entró a la página), le mostramos el formulario
-    # Le pasamos la lista de grupos para armar el menú desplegable (select)
-    return render_template('form_crear.html', grupos=grupos)
-
-
-#Edicion contactos
-@app.route('/contactos/<int:id>/editar/', methods=['GET', 'POST'])
-def editar_contacto(id):
-    # 1. Buscamos el contacto que queremos editar
-    contacto_encontrado = next((c for c in contactos if c['id_contacto'] == id), None)
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    error = None
     
-    if not contacto_encontrado:
-        return "Contacto no encontrado", 404
-
     if request.method == 'POST':
-        # 2. Si el usuario envió el formulario, capturamos los nuevos datos
-        nuevo_nombre = request.form.get('nombre')
-        nuevo_telefono = request.form.get('telefono')
-        nuevo_correo = request.form.get('correo')
-        nuevo_grupo = int(request.form.get('grupo'))
+        nombre = request.form['nombre'].strip()
+        telefono = request.form['telefono'].strip()
+        correo = request.form.get('correo', '').strip()
+        fk_grupo = request.form['grupo']
+        
+        if not telefono.isdigit() or len(telefono) != 9:
+            error = "El teléfono debe contener exactamente 9 dígitos numéricos."
+        elif len(nombre) < 3:
+            error = "El nombre ingresado es muy corto. Debe tener al menos 3 letras."
+            
+        if not error:
+            cursor.execute(
+                "INSERT INTO contacto (nombre_completo, telefono, correo, fk_grupo) VALUES (%s, %s, %s, %s)",
+                (nombre, telefono, correo, int(fk_grupo))
+            )
+            conexion.commit()
+            cursor.close()
+            conexion.close()
+            return redirect(url_for('lista_contactos'))
+            
+    cursor.execute("SELECT * FROM grupo")
+    grupos_db = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+    return render_template('form_crear.html', grupos=grupos_db, error=error)
 
-        # Validación del teléfono
-        if len(nuevo_telefono) != 9 or not nuevo_telefono.isdigit():
-            return "Error: El teléfono debe tener exactamente 9 números.", 400
-
-        # 3. Actualizamos los datos en nuestro diccionario en memoria
-        contacto_encontrado['nombre_completo'] = nuevo_nombre
-        contacto_encontrado['telefono'] = nuevo_telefono
-        contacto_encontrado['correo'] = nuevo_correo
-        contacto_encontrado['fk_grupo'] = nuevo_grupo
-
-        # 4. Redireccionamos de vuelta a la lista
-        return redirect(url_for('lista_contactos'))
-
-    # Si es GET, mostramos el formulario con los datos actuales
-    return render_template('form_editar.html', contacto=contacto_encontrado, grupos=grupos)
-
-
-# Eliminira
-@app.route('/contactos/<int:id>/eliminar/', methods=['GET', 'POST'])
-def eliminar_contacto(id):
-    # 1. Buscamos el contacto que se desea borrar
-    contacto_encontrado = next((c for c in contactos if c['id_contacto'] == id), None)
+@app.route('/contactos/<int:id_contacto>/editar/', methods=['GET', 'POST'])
+@login_requerido
+def editar_contacto(id_contacto):
+    conexion = conectar_db()
+    cursor = conexion.cursor()
     
-    if not contacto_encontrado:
-        return "Contacto no encontrado", 404
-
     if request.method == 'POST':
-        # 2. Si el usuario confirma en el formulario (POST), lo eliminamos de la lista
-        contactos.remove(contacto_encontrado)
-        # 3. Redireccionamos de vuelta a la lista general
+        nombre = request.form['nombre']
+        telefono = request.form['telefono']
+        correo = request.form.get('correo', '')
+        fk_grupo = int(request.form['grupo'])
+        
+        cursor.execute(
+            "UPDATE contacto SET nombre_completo=%s, telefono=%s, correo=%s, fk_grupo=%s WHERE id_contacto=%s",
+            (nombre, telefono, correo, fk_grupo, id_contacto)
+        )
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+        return redirect(url_for('detalle_contacto', id_contacto=id_contacto))
+        
+    cursor.execute("SELECT * FROM contacto WHERE id_contacto = %s", (id_contacto,))
+    contacto = cursor.fetchone()
+    
+    cursor.execute("SELECT * FROM grupo")
+    grupos_db = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+    return render_template('form_editar.html', contacto=contacto, grupos=grupos_db)
+
+@app.route('/contactos/<int:id_contacto>/eliminar/', methods=['GET', 'POST'])
+@login_requerido
+def eliminar_contacto(id_contacto):
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    
+    if request.method == 'POST':
+        cursor.execute("DELETE FROM contacto WHERE id_contacto = %s", (id_contacto,))
+        conexion.commit()
+        cursor.close()
+        conexion.close()
         return redirect(url_for('lista_contactos'))
-
-    # Si es GET, mostramos la página de confirmación con los datos del contacto
-    return render_template('confirmar_eliminar.html', contacto=contacto_encontrado)
-
-
-# ==========================================
-# RUTAS PARA CATEGORÍAS Y GRUPOS
-# ==========================================
+        
+    cursor.execute("SELECT * FROM contacto WHERE id_contacto = %s", (id_contacto,))
+    contacto = cursor.fetchone()
+    cursor.close()
+    conexion.close()
+    return render_template('confirmar_eliminar.html', contacto=contacto)
 
 @app.route('/categorias/nuevo/', methods=['GET', 'POST'])
+@login_requerido
 def crear_categoria():
     if request.method == 'POST':
-        nombre_cat = request.form.get('nombre')
-        nuevo_id = len(categorias) + 1
-        
-        nueva_categoria = {
-            "id_categoria": nuevo_id,
-            "nombre": nombre_cat
-        }
-        categorias.append(nueva_categoria)
-        # Te redirige a crear un grupo para que uses tu nueva categoría de inmediato
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        nombre = request.form['nombre']
+        cursor.execute("INSERT INTO categoria (nombre) VALUES (%s)", (nombre,))
+        conexion.commit()
+        cursor.close()
+        conexion.close()
         return redirect(url_for('crear_grupo'))
-        
     return render_template('form_categoria.html')
 
-
 @app.route('/grupos/nuevo/', methods=['GET', 'POST'])
+@login_requerido
 def crear_grupo():
+    conexion = conectar_db()
+    cursor = conexion.cursor()
     if request.method == 'POST':
-        nombre_grupo = request.form.get('nombre')
-        descripcion = request.form.get('descripcion')
-        fk_categoria = int(request.form.get('categoria'))
-        
-        nuevo_id = len(grupos) + 1
-        
-        nuevo_grupo = {
-            "id_grupo": nuevo_id,
-            "nombre": nombre_grupo,
-            "descripcion": descripcion,
-            "fk_categoria": fk_categoria
-        }
-        grupos.append(nuevo_grupo)
+        nombre = request.form['nombre']
+        descripcion = request.form.get('descripcion', '')
+        fk_categoria = int(request.form['categoria'])
+        cursor.execute(
+            "INSERT INTO grupo (nombre, descripcion, fk_categoria) VALUES (%s, %s, %s)",
+            (nombre, descripcion, fk_categoria)
+        )
+        conexion.commit()
+        cursor.close()
+        conexion.close()
         return redirect(url_for('crear_contacto'))
         
-    # Le pasamos las categorías para que el usuario elija a cuál pertenece el nuevo grupo
-    return render_template('form_grupo.html', categorias=categorias)
+    cursor.execute("SELECT * FROM categoria")
+    categorias_db = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+    return render_template('form_grupo.html', categorias=categorias_db)
 
+# ==========================================
+# 4. RUTAS API (Sin protección para pruebas en Swagger)
+# ==========================================
 
-# rutas api
 @app.route('/api/contactos', methods=['GET'])
 def api_contactos():
     """
     Obtener la lista completa de contactos
-    Este endpoint devuelve todos los contactos registrados actualmente en el sistema.
     ---
     tags:
       - Contactos API
     responses:
       200:
-        description: Una lista de objetos de contacto
-        schema:
-          type: array
-          items:
-            type: object
-            properties:
-              id_contacto:
-                type: integer
-                example: 1
-              nombre_completo:
-                type: string
-                example: "Ana López"
-              telefono:
-                type: string
-                example: "912345678"
-              correo:
-                type: string
-                example: "ana@ejemplo.com"
-              fk_grupo:
-                type: integer
-                example: 1
+        description: Lista de contactos
     """
-    return jsonify(contactos)
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT * FROM contacto")
+    contactos_db = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+    return jsonify(contactos_db), 200
 
-@app.route('/api/grupos', methods=['GET'])
-def api_grupos():
-    return jsonify(grupos)
+@app.route('/api/contactos/<int:id_contacto>', methods=['GET'])
+def api_detalle_contacto(id_contacto):
+    """
+    Obtener un solo contacto por su ID
+    ---
+    tags:
+      - Contactos API
+    parameters:
+      - in: path
+        name: id_contacto
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Datos del contacto
+      404:
+        description: Contacto no encontrado
+    """
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT * FROM contacto WHERE id_contacto = %s", (id_contacto,))
+    contacto = cursor.fetchone()
+    cursor.close()
+    conexion.close()
+    
+    if contacto:
+        return jsonify(contacto), 200
+    return jsonify({"error": "Contacto no encontrado"}), 404
 
-# Hacer que corra el servidor
+@app.route('/api/contactos', methods=['POST'])
+def api_crear_contacto():
+    """
+    Crear un nuevo contacto
+    ---
+    tags:
+      - Contactos API
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            nombre_completo: {type: string, example: "Pedro Pascal"}
+            telefono: {type: string, example: "977665544"}
+            correo: {type: string, example: "pedro@ejemplo.com"}
+            fk_grupo: {type: integer, example: 1}
+    responses:
+      201:
+        description: Contacto creado
+      400:
+        description: Error de validación (Bad Request)
+    """
+    datos = request.get_json()
+    telefono = datos.get('telefono', '').strip()
+    nombre = datos.get('nombre_completo', '').strip()
+    
+    if not telefono.isdigit() or len(telefono) != 9:
+        return jsonify({"error": "Validación fallida: El teléfono debe contener exactamente 9 dígitos numéricos."}), 400
+        
+    if len(nombre) < 3:
+        return jsonify({"error": "Validación fallida: El nombre debe tener al menos 3 caracteres."}), 400
+        
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    cursor.execute(
+        "INSERT INTO contacto (nombre_completo, telefono, correo, fk_grupo) VALUES (%s, %s, %s, %s)",
+        (nombre, telefono, datos.get('correo', ''), datos.get('fk_grupo'))
+    )
+    conexion.commit()
+    nuevo_id = cursor.lastrowid
+    cursor.close()
+    conexion.close()
+    return jsonify({"mensaje": "Contacto creado", "id_insertado": nuevo_id}), 201
+
+@app.route('/api/contactos/<int:id_contacto>', methods=['PUT'])
+def api_editar_contacto(id_contacto):
+    """
+    Actualizar un contacto existente
+    ---
+    tags:
+      - Contactos API
+    parameters:
+      - in: path
+        name: id_contacto
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            nombre_completo: {type: string}
+            telefono: {type: string}
+            correo: {type: string}
+            fk_grupo: {type: integer}
+    responses:
+      200:
+        description: Contacto actualizado
+    """
+    datos = request.get_json()
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    cursor.execute(
+        "UPDATE contacto SET nombre_completo=%s, telefono=%s, correo=%s, fk_grupo=%s WHERE id_contacto=%s",
+        (datos.get('nombre_completo'), datos.get('telefono'), datos.get('correo', ''), datos.get('fk_grupo'), id_contacto)
+    )
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+    return jsonify({"mensaje": f"Contacto {id_contacto} actualizado"}), 200
+
+@app.route('/api/contactos/<int:id_contacto>', methods=['DELETE'])
+def api_eliminar_contacto(id_contacto):
+    """
+    Eliminar un contacto
+    ---
+    tags:
+      - Contactos API
+    parameters:
+      - in: path
+        name: id_contacto
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Contacto eliminado
+    """
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    cursor.execute("DELETE FROM contacto WHERE id_contacto = %s", (id_contacto,))
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+    return jsonify({"mensaje": f"Contacto {id_contacto} eliminado"}), 200
+
+@app.route('/api/resumen/', methods=['GET'])
+def api_resumen_estadisticas():
+    """
+    Obtener estadísticas del sistema (Punto Extra)
+    Devuelve los totales calculados de las entidades principales.
+    ---
+    tags:
+      - Resumen API
+    responses:
+      200:
+        description: JSON con los totales de contactos, grupos y categorías
+    """
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    
+    cursor.execute("SELECT COUNT(*) AS total FROM contacto")
+    total_contactos = cursor.fetchone()['total']
+    
+    cursor.execute("SELECT COUNT(*) AS total FROM grupo")
+    total_grupos = cursor.fetchone()['total']
+    
+    cursor.execute("SELECT COUNT(*) AS total FROM categoria")
+    total_categorias = cursor.fetchone()['total']
+    
+    cursor.close()
+    conexion.close()
+    
+    return jsonify({
+        "estadisticas": {
+            "total_contactos": total_contactos,
+            "total_grupos": total_grupos,
+            "total_categorias": total_categorias
+        },
+        "mensaje": "Resumen generado exitosamente"
+    }), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
