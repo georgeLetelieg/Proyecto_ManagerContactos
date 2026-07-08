@@ -475,4 +475,6 @@ def api_resumen_estadisticas():
     }), 200
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Usamos el puerto que inyecta la nube, o el 5000 si estás en tu PC
+    puerto = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=puerto)
