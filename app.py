@@ -1,13 +1,13 @@
 import os
 import pymysql
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
 from flasgger import Swagger
 
 app = Flask(__name__)
 swagger = Swagger(app)
 
-# CLAVE SECRETA OBLIGATORIA PARA LAS SESIONES
+# CLAVE SECRETA OBLIGATORIA PARA LAS SESIONES Y FLASH
 app.secret_key = 'manager_super_secreto_2026'
 
 # ==========================================
@@ -15,11 +15,13 @@ app.secret_key = 'manager_super_secreto_2026'
 # ==========================================
 def conectar_db():
     # Railway inyectará estas variables automáticamente. 
-    # Si no existen (estás en local), usará los valores de XAMPP por defecto.
     host = os.environ.get('MYSQLHOST', '127.0.0.1')
     user = os.environ.get('MYSQLUSER', 'root')
     password = os.environ.get('MYSQLPASSWORD', '')
-    database = os.environ.get('MYSQLDATABASE', 'railway')
+    
+    # CORRECCIÓN PARA RAILWAY APLICADA AQUÍ:
+    database = os.environ.get('MYSQL_DATABASE', 'railway')
+    
     port = int(os.environ.get('MYSQLPORT', 3306))
 
     return pymysql.connect(
@@ -248,11 +250,22 @@ def crear_categoria():
         conexion = conectar_db()
         cursor = conexion.cursor()
         nombre = request.form['nombre']
-        cursor.execute("INSERT INTO categoria (nombre) VALUES (%s)", (nombre,))
-        conexion.commit()
-        cursor.close()
-        conexion.close()
-        return redirect(url_for('crear_grupo'))
+        
+        # Lógica añadida: Validar si existe
+        cursor.execute("SELECT * FROM categoria WHERE nombre = %s", (nombre,))
+        if cursor.fetchone():
+            flash(f"Error: Ya existe una categoría llamada '{nombre}'.")
+            cursor.close()
+            conexion.close()
+            return redirect(url_for('crear_categoria'))
+        else:
+            cursor.execute("INSERT INTO categoria (nombre) VALUES (%s)", (nombre,))
+            conexion.commit()
+            flash("Categoría creada con éxito.")
+            cursor.close()
+            conexion.close()
+            return redirect(url_for('crear_grupo'))
+            
     return render_template('form_categoria.html')
 
 @app.route('/grupos/nuevo/', methods=['GET', 'POST'])
@@ -271,6 +284,7 @@ def crear_grupo():
         conexion.commit()
         cursor.close()
         conexion.close()
+        flash("Grupo creado con éxito.")
         return redirect(url_for('crear_contacto'))
         
     cursor.execute("SELECT * FROM categoria")
@@ -278,6 +292,43 @@ def crear_grupo():
     cursor.close()
     conexion.close()
     return render_template('form_grupo.html', categorias=categorias_db)
+
+# ==========================================
+# RUTAS NUEVAS PARA ELIMINAR CATEGORÍAS Y GRUPOS
+# ==========================================
+
+@app.route('/categorias/<int:id_categoria>/eliminar/', methods=['POST'])
+@login_requerido
+def eliminar_categoria(id_categoria):
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    
+    # Validar si tiene grupos asociados
+    cursor.execute("SELECT * FROM grupo WHERE fk_categoria = %s", (id_categoria,))
+    if cursor.fetchone():
+        flash("Error: No puedes eliminar esta categoría porque tiene grupos dentro. Elimina los grupos primero.")
+    else:
+        cursor.execute("DELETE FROM categoria WHERE id_categoria = %s", (id_categoria,))
+        conexion.commit()
+        flash("Categoría eliminada correctamente.")
+        
+    cursor.close()
+    conexion.close()
+    return redirect(url_for('lista_contactos'))
+
+@app.route('/grupos/<int:id_grupo>/eliminar/', methods=['POST'])
+@login_requerido
+def eliminar_grupo(id_grupo):
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    
+    cursor.execute("DELETE FROM grupo WHERE id_grupo = %s", (id_grupo,))
+    conexion.commit()
+    
+    cursor.close()
+    conexion.close()
+    flash("Grupo y sus contactos eliminados correctamente.")
+    return redirect(url_for('lista_contactos'))
 
 # ==========================================
 # 4. RUTAS API (Documentadas y en Formato JSON)
@@ -475,6 +526,5 @@ def api_resumen_estadisticas():
     }), 200
 
 if __name__ == '__main__':
-    # Usamos el puerto que inyecta la nube, o el 5000 si estás en tu PC
     puerto = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=puerto)
