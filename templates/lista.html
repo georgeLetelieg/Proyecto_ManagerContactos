@@ -6,8 +6,8 @@
         <h2>Mi Agenda</h2>
     </div>
     
-    <div class="col-md-5">
-        <form action="/contactos/" method="GET" class="d-flex">
+    <div class="col-md-5 d-flex">
+        <form action="/contactos/" method="GET" class="d-flex w-100">
             <select name="categoria" class="form-select me-2">
                 <option value="">Todas las Categorías</option>
                 {% for c in categorias %}
@@ -18,6 +18,14 @@
             </select>
             <button type="submit" class="btn btn-secondary">Filtrar</button>
         </form>
+        
+        {% if categoria_seleccionada %}
+        <form action="{{ url_for('eliminar_categoria', id_categoria=categoria_seleccionada) }}" method="POST" class="ms-2">
+            <button type="submit" class="btn btn-outline-danger" title="Eliminar Categoría" onclick="return confirm('¿Estás seguro de eliminar esta categoría? Recuerda que debe estar vacía (sin grupos).');">
+                🗑️
+            </button>
+        </form>
+        {% endif %}
     </div>
 
     <div class="col-md-3 text-end">
@@ -30,12 +38,18 @@
     {% for grupo in vista_agrupada %}
     <div class="accordion-item">
         
-        <h2 class="accordion-header" id="heading-{{ grupo.id_grupo }}">
+        <h2 class="accordion-header d-flex" id="heading-{{ grupo.id_grupo }}">
             <button class="accordion-button collapsed bg-light text-dark fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ grupo.id_grupo }}">
                 <span class="badge bg-primary me-2">{{ grupo.nombre_categoria }}</span> 
                 Grupo: {{ grupo.nombre_grupo }} 
                 <span class="badge bg-secondary ms-2">{{ grupo.contactos|length }} Contacto(s)</span>
             </button>
+            
+            <form action="{{ url_for('eliminar_grupo', id_grupo=grupo.id_grupo) }}" method="POST" class="bg-light d-flex align-items-center pe-3 border-bottom border-top border-end m-0">
+                <button type="submit" class="btn btn-danger btn-sm" title="Eliminar Grupo completo" onclick="return confirm('ATENCIÓN: ¿Estás seguro de eliminar este grupo? Se borrarán TODOS los contactos que estén adentro.');">
+                    🗑️
+                </button>
+            </form>
         </h2>
         
         <div id="collapse-{{ grupo.id_grupo }}" class="accordion-collapse collapse" data-bs-parent="#acordeonGrupos">
@@ -85,7 +99,7 @@
 
     {% if not vista_agrupada %}
     <div class="alert alert-warning text-center mt-3">
-        No se encontraron grupos para esta categoría.
+        No se encontraron grupos para mostrar.
     </div>
     {% endif %}
 
