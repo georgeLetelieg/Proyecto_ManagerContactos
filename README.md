@@ -53,9 +53,15 @@ Proyecto_Manager_de_Contactos/
 │   --- confirmar_eliminar.html # Pantalla de advertencia de borrado
 │   --- form_categoria.html # Formulario para nuevas categorías
 │   --- form_grupo.html     # Formulario para nuevos grupos
+    --- login.html          # Login de autenticacion por usuario
 --- static/                 # Recursos estáticos (CSS/Imágenes adicionales)
 --- app.py                  # Main del proyecto y rutas
 --- requirements.txt        # Dependencias del proyecto
 --- .gitignore              # Archivos excluidos del control de versiones
+--- Procfile                # Instruccion para Railway
 --- README.md               # Documentación del proyecto
 
+
+# URL DEL DOMINIO OTORGADO POR RAILWAY (PAGINA DESPLEGADA)
+
+- proyectomanagercontactos-production.up.railway.app
